@@ -1,0 +1,302 @@
+---
+title: "Transport constructions in Russian"
+author: "Olga Semenova"
+output:
+  word_document: default
+  pdf_document:
+    latex_engine: pdflatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Problem Statement
+
+The goal of my research is to explore the behavior of rival forms of construction describing transportation in Russian. There are two possible ways to specify the type of transport used for movement:
+
+•	construction with a noun in Instrumental case (e.g. доехать поездом, доставлять самолетами, путешествовать автобусом etc.)
+
+•	construction with a preposition and a noun in Prepositional case (e.g. добираться на поезде, лететь на самолете, уезжать на автобусе etc.)
+
+Thus, the study aims to find out whether the choice of the construction depends on certain specific properties of the context, which it used in, or not. 
+
+
+## Hypothesis
+
+I formulate research hypotheses as follows:
+
+The null hypothesis of the study: There is no association between the choice of the construction and certain contextual variables (such as properties of the verb in the construction, number of the noun, length of sentence and year of creation).
+
+The alternative hypothesis H1: There is an association between the choice of the construction and certain contextual variables.
+
+Regarding numerical variables, I have more precise assumptions that allow me to formulate more explicit hypotheses for them.
+
+H2: The later the year of creation, the greater the probability that the sentence contains a prepositional construction.
+
+H3: The longer the sentence, the more likely it is to contain a prepositional construction.
+
+As for categorical variables, I do not have specific assumptions as to what value can be associated with which construction.
+
+## Data
+
+For the purpose of the study I collected examples from Russian National Corpus containing constructions mentioned above. I annotated examples in order to identify contextual variables, which supposedly can influence construction choice. The dataset contents following columns:
+
+•	Verb – verbal part of the construction
+
+•	Transport – noun part of the construction
+
+•	Construction_type – one of two types of the construction (levels: INS (construction with a noun in Instrumental case) and PREP (construction with a preposition and a noun in Prepositional case))
+
+•	Normal_form - normal form of the verb
+
+•	Prefix – whether or not the verb has prefix (levels: yes for verbs with prefix and no for verbs without prefix)
+
+•	Tense – tense of the verb (levels: past (past tense), pres (present tense) and futr (future tense))
+
+•	Aspect – aspect of the verb (levels: impf (imperfective aspect) and perf (perfective aspect))
+
+•	Number – number of the transport noun (levels: plur(plural number) and sing (singular number))
+
+•	Full_context – complete sentence with the construction
+
+•	Sent_length – the length of the sentence in words
+
+•	Author – name of the author
+
+•	Header – name of the source of sentence
+
+•	Created – year of creation of the source.
+
+```{r, message=FALSE }
+library(ggplot2)
+library(tidyverse)
+library(caret)
+library(party)
+library(effects)
+```
+
+## Data visualization
+
+Let's take a look at the data
+We can observe some of the descriptive statistics for both categorical and numerical variables.
+
+```{r }
+df <- read.csv("https://raw.githubusercontent.com/olgasem10/Transport_constructions/master/Transport_constructions.csv", encoding = "UTF-8")
+summary(df[ , -which(names(df) %in% c("Full_context", "Author", "Header"))])
+```
+
+To begin with, let's look at several graphs that give a more complete picture of the contents of the dataset and the distribution of data in it.
+
+As one can see, most examples belong to the second half of the 20th century and the beginning of the 21th.
+```{r }
+df %>% 
+  ggplot(aes(Created, fill = Construction_type, color = Construction_type))+
+  geom_density(alpha = 0.4)+
+  geom_rug()+
+  labs(title = "Distribution of examples by year of creation",
+       x = "Year of creation")
+```
+
+Violin plots showing the distribution of examples depending on the value of the sentence length allow to see that the distribution differs slightly for sentences containing different types of structures. There is a tendency that sentences containing constructions with a preposition are longer on average.
+
+```{r }
+ggplot(df, aes(x = Construction_type, y = Sent_length))+
+  geom_violin(aes(color = Construction_type), position = position_dodge(1) )+
+  geom_boxplot(aes(color = Construction_type), width = 0.25, position = position_dodge(1))+
+  labs(title = "Sentence length violin plots", x = "Construction type", y = "Sentence length")
+```
+
+The following histograms show the number of examples contained in the dataset with different values of categorical variables, taking into account the type of сonstruction under study.
+
+Most of the verbs in the examples have prefixes.
+```{r }
+ggplot(df, aes(x = Construction_type, fill = Prefix))+
+  geom_bar(colour = "black", position = "dodge")+
+  labs(title = "Amount of examples with/without prefix", x = "Construction type")
+```
+
+Vast majority of verbs are in past tense.
+
+```{r }
+ggplot(df, aes(x = Construction_type, fill = Tense))+
+  geom_bar(colour = "black", position = "dodge")+
+  labs(title = "Amount of examples with past, present and future tense", x = "Construction type")
+```
+
+Vast majority of the transport nouns are in singular form.
+
+```{r }
+ggplot(df, aes(x = Construction_type, fill = Number))+
+  geom_bar(colour = "black", position = "dodge")+
+  labs(title = "Amount of examples with plural and singular number", x = "Construction type")
+```
+
+In constructions with a noun in Instrumental case the number of perfect and imperfect verbs is almost equal, while in the constructions with a noun in Prepositional case, the imperfective verbs prevail.
+
+```{r }
+ggplot(df, aes(x = Construction_type, fill = Aspect))+
+  geom_bar(colour = "black", position = "dodge")+
+  labs(title = "Amount of examples with imperfective and perfective aspect", x = "Construction type")
+```
+
+The following scatterplots show the distribution of examples along the length of the sentence and year of creation, taking into account the type of сonstruction and the value of categorical variables.
+
+```{r }
+ggplot(df, aes(x = Sent_length, y = Created, color = Prefix))+
+  geom_point()+
+  facet_wrap(~Construction_type)+
+  labs(x = "Sentence length", y = "Year of creation")
+```
+
+```{r }
+ggplot(df, aes(x = Sent_length, y = Created, color = Tense))+
+  geom_point()+
+  facet_wrap(~Construction_type)+
+  labs(x = "Sentence length", y = "Year of creation")
+```
+
+```{r }
+ggplot(df, aes(x = Sent_length, y = Created, color = Aspect))+
+  geom_point()+
+  facet_wrap(~Construction_type)+
+  labs(x = "Sentence length", y = "Year of creation")
+```
+
+```{r }
+ggplot(df, aes(x = Sent_length, y = Created, color = Number))+
+  geom_point()+
+  facet_wrap(~Construction_type)+
+  labs(x = "Sentence length", y = "Year of creation")
+```
+
+## Statistical analysis
+
+First, I examine if there is an association between the target variable and the predictors for each variable separately.
+
+### Numerical variables
+
+To test hypothesis H2 I apply logistic regression model with one predictor (variable Created).
+
+```{r}
+fit1 <- glm(Construction_type~Created, data = df, family = "binomial")
+summary(fit1)
+```
+
+As one can see, p-value for this variable is over 5%, so I can not declare the variable as significant and reject null hypothesis.
+
+Next, to test hypothesis H3 I apply logistic regression model with one predictor (variable Sent_length).
+
+```{r}
+fit2 <- glm(Construction_type~Sent_length, data = df, family = "binomial")
+summary(fit2)
+```
+
+P-value for ariable Sent_length is 0.00224, which means that I now can claim that variable Sent_length (the length of the sentence) is significant.
+
+### Categorical variables
+
+To examine if there is an association between categorical variables and the target variable, I apply chi-squared tests for each variable.
+
+```{r}
+chisq.test(df$Construction_type, df$Prefix)
+```
+```{r}
+chisq.test(df$Construction_type, df$Tense)
+```
+```{r}
+chisq.test(df$Construction_type, df$Aspect)
+```
+```{r}
+chisq.test(df$Construction_type, df$Number)
+```
+
+Only the latter chi-squared test showed the p-value less then 5%, so the only variable which has the association with target variable is Number.
+
+### Model with all variables
+
+Now I try to combine all the variables into one logistic regression.
+
+```{r}
+fit3 <- glm(Construction_type~Prefix+Tense+Aspect+Number+Created+Sent_length, data = df, family = "binomial")
+summary(fit3)
+```
+
+I used all the variables and try different interactions of them, but most of the variables remain insignificant.
+
+Therefore, I remove most of the variables and the final version of the model contains only Number and Sent_length.
+As one can see, AIC (Akaike Information Criterion) is also smaller for this model. 
+
+```{r}
+fit4 <- glm(Construction_type~Number + Sent_length, data = df, family = "binomial")
+summary(fit4)
+```
+
+I also try to include the interaction of variables in the model, but it only worsens the result.
+
+```{r}
+fit5 <- glm(Construction_type~Number + Sent_length + Number:Sent_length, data = df, family = "binomial")
+summary(fit5)
+```
+
+Following graps are effect plots for variables Number and Sent_length.They show how predicted probabilities value changes with the value of the variables involved in the model.
+
+```{r}
+plot(allEffects(fit4))
+```
+
+I also use the decision tree model to further check the significance of variables. The division into classes took into account the same variables.
+
+```{r}
+tree <- ctree(Construction_type~Number+Sent_length+Aspect+Tense+Prefix, data = df)
+plot(tree)
+```
+
+## Prediction
+
+To test the predictive capabilities of the model, I divide the data into test and train and predict the values for the test sample
+
+```{r}
+data1 <- df[order(runif(nrow(df))),]
+split <- createDataPartition(y = data1$Construction_type, p = 0.9, list = FALSE)
+train_set <- data1[split, ]
+test_set <- data1[-split, ]
+```
+
+```{r}
+fit6 <- glm(Construction_type~ Number + Sent_length, data = train_set, family = "binomial")
+```
+
+```{r}
+response <- predict(fit6, newdata=test_set, type="response")
+scores <- data.frame(response=response,
+                         construction_obs=test_set$Construction_type,
+                         stringsAsFactors=FALSE)
+v <- rep(NA, nrow(scores))
+v <- ifelse(scores$response >= .5, "PREP", "INS")
+scores$construction_pred <- as.factor(v)
+```
+
+```{r}
+confusionMatrix(data = scores$construction_pred, reference = scores$construction_obs, positive="INS")
+```
+
+By dividing into test and train several times, I got values ranging from 56.7 to 65%.
+Given that the class ratio is 45% and 55%, we can say that the model, although it shows low quality and tends to predict PREP in most cases, still outperforms the model just predicting a larger class.
+
+## Linguistic interpretation
+
+Having examined and compared the results of the models, I can draw some linguistic conclusions.
+
+The hypothesis about the time of creation (H2) was not confirmed, which means that on the basis of our dataset we cannot make a claim that over time, one construction began to be used less often and the other more often.
+
+The hypothesis about the length of the sentence (H3) was confirmed, which may mean that shorter sentences also contain a shorter form of the construction under study, that is, a form without an preposition.
+
+As for the study of the properties of the verb, such as its tense, aspect and presence or absence of prefix, none of these properties showed a statistical correlation with the choice of construction, which means that the construction is chosen regardless of these properties of the verb.
+
+Having examined the behavior of a variable containing a number of the transport noun, I can claim that the plural form tends to occur more often in constructions with prepositions than in constructions without prepositions. That is, constructions such as ездить на поездах in the Russian are more common than ездить поездами.
+
+## Conclusion
+
+After analyzing and summarizing the results of the work of different models, I can conclude that when considering the choice of the construction describing transportation in Russian, the length of the sentence and the number of the transport noun show a significant correlation.
+But at the same time the overall quality demonstrated by the models based on these variables nevertheless remains low, which leaves room for possible further research and search for other properties of the context that influence the choice of one of these rival forms.
